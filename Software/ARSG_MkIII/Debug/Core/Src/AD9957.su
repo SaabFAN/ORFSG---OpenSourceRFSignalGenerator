@@ -1,0 +1,7 @@
+AD9957.c:13:6:AD9957_Setup	4	static
+AD9957.c:17:6:AD9957_PLLCheck	4	static
+AD9957.c:21:6:AD9957_SetMode	16	static
+AD9957.c:25:6:AD9957_CWFreq	16	static
+AD9957.c:29:6:AD9957_CWAmplitude	16	static
+AD9957.c:33:6:AD9957_CWPhase	16	static
+AD9957.c:37:6:AD9957_FillIntRAM	16	static

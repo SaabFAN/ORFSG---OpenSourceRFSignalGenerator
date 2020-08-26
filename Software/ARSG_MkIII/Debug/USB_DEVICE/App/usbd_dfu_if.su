@@ -1,0 +1,6 @@
+usbd_dfu_if.c:155:10:MEM_If_Init_FS	4	static
+usbd_dfu_if.c:166:10:MEM_If_DeInit_FS	4	static
+usbd_dfu_if.c:178:10:MEM_If_Erase_FS	16	static
+usbd_dfu_if.c:193:10:MEM_If_Write_FS	24	static
+usbd_dfu_if.c:207:10:MEM_If_Read_FS	24	static
+usbd_dfu_if.c:222:10:MEM_If_GetStatus_FS	24	static
