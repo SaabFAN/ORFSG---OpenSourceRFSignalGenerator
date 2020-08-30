@@ -11,23 +11,111 @@ ADF_CONF adf_config;
 
 extern SPI_HandleTypeDef hspi2;
 
-void ADF4355_ConvertFreq();
+unsigned char setup_complete = 0x00;
+
+void ADF4355_ConvertFreq(double frequency);
 void ADF4355_WriteData();
 void ADF4355_WriteRegister(int adfreg);
 void ADF4355_WriteDataLite(uint8_t mode);
 
-uint8_t ADF4355_Setup(uint8_t startup, long refCLK, uint8_t mode) {	// Setup the ADF4355 with standard values (Output: ON, Freqency: 100 MHz (for debug-purposes)
+uint8_t ADF4355_Setup(uint8_t startup, long refCLK, uint8_t mode, int MOD2) { // Setup the ADF4355 with standard values (Output: ON, Freqency: 100 MHz (for debug-purposes)). Requires Reference-Frequency, Mode, MOD2-Value
+	switch (setup_complete) {
+	case 0x01:
+		break;
+	default:
+		startup = 0x01;	// Setup has not been completed, set Startup to true to make sure the chip is being set up correctly.
+		break;
+	}
 	switch (startup) {
 	case 0x01: // This is the first time we're running the Setup - ADF4355-Configuration needs to be set up.
 		if (refCLK < 10000000) {
 // RefCLK Lower than 10 MHz and out of Range!
 			adf_config.ERROR = 0xF0; // Save the REFERENCE-ERROR and
 		}
+		adf_config.REFCLK = refCLK;
+		adf_config.AMPLITUDE = 0;	// Set Amplitude to lowest possible value
+		adf_config.MODE = mode;	// Store the supplied Mode in the Mode-Variable
+		adf_config.R0_PRESCAL = 0;	// Set Prescaler to 4/5 Mode
+		adf_config.R0_AUTOCAL = 1;	// Enable the Autocalibration
+		adf_config.R0_Nmin = 23;
+		if (MOD2 <= 2) {
+			adf_config.R2_MOD2_LSB = 2;	// Default-Value for MOD2
+		} else {
+			adf_config.R2_MOD2_LSB = MOD2;
+		}
+
+		adf_config.R4_MUXOUT = 4;	// Set the MUXOUT to Digital Lock-Detect
+		adf_config.R4_REFDOUBLE = 1;
+		adf_config.R4_REFDIV2 = 0;
+		adf_config.R4_RCOUNTER = 1;
+		adf_config.R4_DOUBLEBUF = 1;
+		adf_config.R4_CHGPUMP = 0x03;	// Set Charge-Pump to 3.3mA
+		adf_config.R4_REFMODE = 1;	// Differential Reference Select
+		adf_config.R4_MUXLOG = 1;
+		adf_config.R4_PDPOLA = 1;
+		adf_config.R4_PWRDN = 0;
+		adf_config.R4_CP3STATE = 0;
+		adf_config.R4_COUNTRES = 0;
+		// Calculate the PFD-Frequency
+		adf_config.PFD = ((adf_config.REFCLK * (adf_config.R4_REFDOUBLE + 1))
+				/ (adf_config.R4_REFDIV2 + 1)) / adf_config.R4_RCOUNTER;
+
+		adf_config.REG5 = 0x00800025; // // REGISTER 5 IS RESERVED AND NEEDS TO BE SET TO 0x00800025
+
+		adf_config.R6_BLEED_POLARITY = 0;
+		adf_config.R6_GATED_BLEED = 1;
+		adf_config.R6_NEGATIVE_BLEED = 64;
+		adf_config.R6_RFOUTB_SELECT = 0;
+		adf_config.R6_FEEDBACK_SELECT = 1;
+		adf_config.R6_RF_DIV_SEL = 6;
+		adf_config.R6_BLEED_CURRENT = 1;	// Default-Value for N = 23
+		adf_config.R6_MUTE_TILL_LOCK = 0;
+		adf_config.R6_AUXRF_ENABLE = 1;
+		adf_config.R6_AUXRF_PWR = 3;
+		adf_config.R6_RFOUT_ENABLE = 0;	// TODO: Set this to ON when RF-Path is populated
+		adf_config.R6_RFOUT_PWR = 0;
+
+		adf_config.R7_LE_SYNC_EDGE = 0;
+		adf_config.R7_LE_SYNC = 1;
+		adf_config.R7_LDC = 2; 	// 2048 Cycles until LOCK-DETECT = TRUE
+		adf_config.R7_LOL_MODE = 0;	// Disable LOL-Mode since Differential Reference is used
+		adf_config.R7_LDP = 3;
+		adf_config.R7_LDM = 0;	// Set to 1 if using a Integer-N
+
+		adf_config.REG8 = 0x15596568; //REGISTER 8 IS RESERVED AND NEEDS TO BE SET TO 0x102D0428 (ADF4355) or 0x15596568 (ADF4356)
+
+		adf_config.R9_VCO_BAND_DIV = (adf_config.PFD / 1600000);
+		adf_config.R9_TIMEOUT = 34;
+		adf_config.R9_AUTOLVL_CAL_TIMEOUT = (int) (((0.0001 * adf_config.PFD)
+				/ adf_config.R9_TIMEOUT) + 1);
+		adf_config.R9_SYNTH_LOCK_TIMEOUT = (int) (((0.00005 * adf_config.PFD)
+				/ adf_config.R9_TIMEOUT) + 1);
+
+		adf_config.R10_ADC_CLK_DIV =
+				(int) (((adf_config.PFD / 90000) - 2) / 4);
+		adf_config.R10_ADC_CONV = 1;
+		adf_config.R10_ADC_ENABLE = 1;
+
+		adf_config.REG11 = 0x0061200B; // REGISTER 11 IS RESERVED AND NEEDS TO BE SET TO 0x0061300B in case of a ADF4355 and 0x61200B in case of a ADF4356
+
+		adf_config.R12_PHASE_RESYNC_CLK_DIV = (int) (0.01 * adf_config.PFD);
+
+		adf_config.R13_FRAC2_MSB = 0;
+		adf_config.R13_MOD2_MSB = 0;
+
+		ADF4355_ConvertFreq(150000000);
+		ADF4355_WriteData();
+		ADF4355_ConvertFreq(120000000);
+		ADF4355_WriteData(FREQ_UPDATE);
 		break;
 	case 0x00: // Chip has already been set up. No need for all the config-data to be set up again.
 		// TODO: Configure the operating-Mode
 		break;
+	default:
+
+		break;
 	}
+	setup_complete = 0x01;
 	return adf_config.ERROR;
 }
 
@@ -52,13 +140,14 @@ void ADF4355_FPGA_WriteData(float frequency, float phase, int amplitude) {
 	// TODO: Implement-Functions that copy an entire sample (up to all 13 Registers, depending on the "stream_mode"-value) to the FPGA, where it'll be stored in SDRAM to be sent to the ADF4355 upon issuing the START-Command.
 }
 
-void ADF4355_FPGA_DUMP(int address) {
+void ADF4355_FPGA_DUMP(int address) {//Dumps the FPGA-Registers and Memory at the specified FPGA Memory-Address
 
 }
 
-void ADF4355_SetFrequency(float frequency) {
-	ADF4355_ConvertFreq();
+void ADF4355_SetFrequency(double frequency) {
+	ADF4355_ConvertFreq(frequency);
 	ADF4355_WriteData();
+	// ADF4355_WriteDataLite(FREQ_UPDATE);
 }
 
 void ADF4355_SetPhase(float phase) {
@@ -69,141 +158,45 @@ void ADF4355_GetConfig(int *responseBuffer) {
 
 }
 
-void ADF4355_ConvertFreq() {
-	// PLL-Reg-R0         =  32bit
-	//   Registerselect        4bit
-	//  int N_Int = 92;       // 16bit
-	int Prescal = 0;         // 1bit geht nicht ??? it does not work
-	int Autocal = 1;          //1 bit
-	//  reserved           // 10bit
-
-	// PLL-Reg-R1         =  32bit
-	//   Registerselect        4bit
-	//   int FRAC1 = 10;       // 24 bit
-	//   reserved              // 4bit
-
-	// PLL-Reg-R2         =  32bit
-	//    Registerselect        4bit
-	int M_Mod2 = 16383;            // 14 bit
-	//    int Frac2 = 0;            // 14 bit
-
-	// PLL-Reg-R3         =  32bit - FIXED !
-	// Registerselect        4bit
-	//Fixed value to be written = 0x3 =3
-
-	// PLL-Reg-R4         =  32bit
-	// Registerselect        4bit
-	int U1_CountRes = 0;     // 1bit
-	int U2_Cp3state = 0;     // 1bit
-	int U3_PwrDown = 0;      // 1bit
-	int U4_PDpola = 1;       // 1bit
-	int U5_MuxLog = 1;          // 1bit
-	int U6_RefMode = 1;          // 1bit
-	//  int U5_LPD = 0;          // 1bit
-	//  int U6_LPF = 1;          // 1bit 1=Integer, 0=Frac not spported yet
-	int CP_ChgPump = 9;      // 4bit
-	int D1_DoublBuf = 0;     // 1bit
-	int R_Counter = 1;       // 10bit
-	int RD1_Rdiv2 = 0;       // 1bit
-	int RD2refdoubl = 0;     // 1bit
-	int M_Muxout = 6;        // 3bit
-	// reserved              // 2bit
-
-	// PLL-Reg-R5         =  32bit
-	// Registerselect        // 4bit
-	// Phase Select: Not of partcular interst in Amatuer radio applications. Leave at a string of zeros.
-
-	// PLL-Reg-R6         =  32bit
-	// Registerselect        // 4bit
-	//Variable value to be written!!!
-	int D_out_PWR = adf_config.AMPLITUDE; // 2bit  OutPwr 0-3 3= +5dBm   Power out 1
-	int D_RF_ena = 1; // 1bit  OutPwr 1=on           0 = off  Outport Null freischalten
-	int Reserved = 0;                 // 3bit
-	int D_RFoutB = 1;         // 1bit  aux OutSel
-	int D_MTLD = 0;              // 1bit
-	int CPBleed = 126;   // 8bit
-	int D_RfDivSel = 3;      // 3bit 3=70cm 4=2m    lokale Variable
-	int D_FeedBack = 1;       // 1bit
-	// reserved              // 7bit
-
-	// PLL-Reg-R7         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0x120000E7 = 301990119 (dec)
-
-	// PLL-Reg-R8         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0x102D0428 = 271385640 (dec)
-
-	// PLL-Reg-R9         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0x5047CC9 = 84180169 (dec)
-
-	// PLL-Reg-R10         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0xC0067A = 12584570 9dec)
-
-	// PLL-Reg-R11         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0x61300B = 6369291 (dec)
-
-	// PLL-Reg-R12         =  32bit
-	// Registerselect        // 4bit
-	//Fixed value to be written = 0x1041C = 66588 (dec)
-
-	// Referenz Freg Calc
-
+void ADF4355_ConvertFreq(double frequency) {
 	// int F4_BandSel = 10.0 * B_BandSelClk / PFDFreq;
-	double RFout = adf_config.FREQUENCY; // VCO-Frequenz  144200000  Freq ist global, RFout ist lokal
+	adf_config.FREQUENCY = (double) frequency; // Desired Output-Frequency
 
-	// calc bandselect und RF-div
-	float outdiv = 1;
-	if (RFout >= 680000000) {
-		outdiv = 0.5;
-		D_RfDivSel = 0;
-		D_RFoutB = 0;
-		D_RF_ena = 0;
+	// Calculate the RF-Divider
+	if (adf_config.FREQUENCY >= 6800000000) { // Driver only considers the RFOUTA of ADF4355 / ADF5355. Frequencies higher than 6.8 GHz are not routed through the RF-Deck of the ARSG but can be taken from "J_rfb". Frequency at J_rfb = RFOUT * 2.
+		adf_config.FREQUENCY = adf_config.FREQUENCY / 2;
+		adf_config.RFDIV = 0;
+		adf_config.R6_RF_DIV_SEL = 0;
+		adf_config.R6_AUXRF_ENABLE = 1;	// Frequency above 6.8 GHz Selected - Assume that a ADF5355 is in the system and make sure the Doubled Output is ON
+		adf_config.R6_AUXRF_PWR = 3;
 	}
-	if (RFout < 680000000) {
-		outdiv = 1;
-		D_RfDivSel = 0;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 6800000000) {
+		adf_config.RFDIV = 0;
+		adf_config.R6_RF_DIV_SEL = 0;
 	}
-	if (RFout < 340000000) {
-		outdiv = 2;
-		D_RfDivSel = 1;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 3400000000) {
+		adf_config.RFDIV = 2;
+		adf_config.R6_RF_DIV_SEL = 1;
 	}
-	if (RFout < 170000000) {
-		outdiv = 4;
-		D_RfDivSel = 2;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 1700000000) {
+		adf_config.RFDIV = 4;
+		adf_config.R6_RF_DIV_SEL = 2;
 	}
-	if (RFout < 85000000) {
-		outdiv = 8;
-		D_RfDivSel = 3;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 850000000) {
+		adf_config.RFDIV = 8;
+		adf_config.R6_RF_DIV_SEL = 3;
 	}
-	if (RFout < 42500000) {
-		outdiv = 16;
-		D_RfDivSel = 4;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 425000000) {
+		adf_config.RFDIV = 16;
+		adf_config.R6_RF_DIV_SEL = 4;
 	}
-	if (RFout < 21250000) {
-		outdiv = 32;
-		D_RfDivSel = 5;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 212500000) {
+		adf_config.RFDIV = 32;
+		adf_config.R6_RF_DIV_SEL = 5;
 	}
-	if (RFout < 10625000) {
-		outdiv = 64;
-		D_RfDivSel = 6;
-		D_RFoutB = 1;
-		D_RF_ena = 1;
+	if (adf_config.FREQUENCY < 106250000) {
+		adf_config.RFDIV = 64;
+		adf_config.R6_RF_DIV_SEL = 6;
 	}
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -212,104 +205,144 @@ void ADF4355_ConvertFreq() {
 	//////////////////////// Results agree exactly with AD demo /////////////////
 	/////////////////////////////////////////////////////////////////////////////
 
-	double PFDFreq = adf_config.REFCLK
-			* ((1.0 + RD2refdoubl) / (R_Counter * (1.0 + RD1_Rdiv2))); //Phase detector frequency
+//	double PFDFreq = adf_config.REFCLK
+//			* ((1.0 + adf_config.R4_REFDOUBLE) / (adf_config.R4_RCOUNTER * (1.0 + adf_config.R4_REFDIV2))); //Phase detector frequency
 
-	double N = ((RFout) * outdiv) / PFDFreq;   // Calculate N
+	double N = ((adf_config.FREQUENCY) * adf_config.RFDIV) / adf_config.PFD; // Calculate N
 
-	int N_Int = N;   // N= 50 for 5 GHz   // Turn N into integer
+	adf_config.R0_N = N;  // Turn N into integer
 
-	double F_Frac1x = (N - N_Int) * pow(2, 24); // Calculate Frac1 (N remainder * 2^24)
+	double F_Frac1x = (N - adf_config.R0_N) * pow(2, 24); // Calculate Frac1 (N remainder * 2^24)
 
-	int F_FracN = F_Frac1x;  // turn Frac1 into an integer
+	adf_config.R1_FRAC1 = F_Frac1x;  // turn Frac1 into an integer
 
-	double F_Frac2x = ((F_Frac1x - F_FracN)) * pow(2, 14); // Claculate Frac2 (F_FracN remainder * 2^14)
+	double F_Frac2x = ((F_Frac1x - adf_config.R1_FRAC1)) * pow(2, 14); // Claculate Frac2 (F_FracN remainder * 2^14)
 
-	int F_Frac1 = F_Frac1x;  // turn Frac1 into integer
-	int F_Frac2 = F_Frac2x;  // turn Frac2 into integer
+	adf_config.R1_FRAC1 = F_Frac1x;  // turn Frac1 into integer
+	adf_config.R2_FRAC2_LSB = F_Frac2x;  // turn Frac2 into integer
+
+	if (adf_config.R1_FRAC1 == 0) {	// Check if the Fractional Values are 0 and if so, configure Negative Bleed and Lock Detect Mode to Integer N-Mode.
+		if (adf_config.R2_FRAC2_LSB == 0) {
+			adf_config.R6_NEGATIVE_BLEED = 0;
+			adf_config.R7_LDM = 1;
+		}
+	} else {
+		adf_config.R6_NEGATIVE_BLEED = 1;
+		adf_config.R7_LDM = 0;
+	}
 
 	////////////////// Set 32 bit register values R0 to R12 ///////////////////////////
 
-	adf_config.REG0 = (int) (0 + N_Int * pow(2, 4) + Prescal * pow(2, 20)
-			+ Autocal * pow(2, 21)); // R0 für Startfrequenz ok
+	adf_config.REG0 = (int) (0 + adf_config.R0_N * pow(2, 4)
+			+ adf_config.R0_PRESCAL * pow(2, 20)
+			+ adf_config.R0_AUTOCAL * pow(2, 21));	// Calculate R0
 
-	adf_config.REG1 = (int) (1 + F_Frac1 * pow(2, 4));
+	adf_config.REG1 = (int) (1 + adf_config.R1_FRAC1 * pow(2, 4));// Calculate R1
 
-	adf_config.REG2 = (int) (2 + M_Mod2 * pow(2, 4) + F_Frac2 * pow(2, 18)); //
+	adf_config.REG2 = (int) (2 + adf_config.R2_MOD2_LSB * pow(2, 4)
+			+ adf_config.R2_FRAC2_LSB * pow(2, 18)); //
 
-	adf_config.REG3 = (int) (0x3); //Fixed value (Phase control not needed)
+	adf_config.REG3 = (int) (3 + adf_config.R3_PHASE_VALUE * pow(2, 4)
+			+ adf_config.R3_PHASE_ADJUST * pow(2, 28)
+			+ adf_config.R3_PHASE_RESYNC * pow(2, 29)
+			+ adf_config.R3_SD_LOAD_RESET * pow(2, 30)); // TODO: CHECK Phase-Register Calculation
 
-	adf_config.REG4 = (int) (4 + U1_CountRes * pow(2, 4)
-			+ U2_Cp3state * pow(2, 5) + U3_PwrDown * pow(2, 6)
-			+ U4_PDpola * pow(2, 7) + U5_MuxLog * pow(2, 8)
-			+ U6_RefMode * pow(2, 9) + CP_ChgPump * pow(2, 10)
-			+ D1_DoublBuf * pow(2, 14) + R_Counter * pow(2, 15)
-			+ RD1_Rdiv2 * pow(2, 25) + RD2refdoubl * pow(2, 26)
-			+ M_Muxout * pow(2, 27));
+	adf_config.REG4 = (int) (4 + adf_config.R4_COUNTRES * pow(2, 4)
+			+ adf_config.R4_CP3STATE * pow(2, 5)
+			+ adf_config.R4_PWRDN * pow(2, 6) + adf_config.R4_PDPOLA * pow(2, 7)
+			+ adf_config.R4_MUXLOG * pow(2, 8)
+			+ adf_config.R4_REFMODE * pow(2, 9)
+			+ adf_config.R4_CHGPUMP * pow(2, 10)
+			+ adf_config.R4_DOUBLEBUF * pow(2, 14)
+			+ adf_config.R4_RCOUNTER * pow(2, 15)
+			+ adf_config.R4_REFDIV2 * pow(2, 25)
+			+ adf_config.R4_REFDOUBLE * pow(2, 26)
+			+ adf_config.R4_MUXOUT * pow(2, 27));
 
-	adf_config.REG5 = 0x800025; // Fixed (Reserved)
+	adf_config.REG6 = (int) (6 + adf_config.R6_RFOUT_PWR * pow(2, 4)
+			+ adf_config.R6_RFOUT_ENABLE * pow(2, 6)
+			+ adf_config.R6_AUXRF_PWR * pow(2, 7)
+			+ adf_config.R6_AUXRF_ENABLE * pow(2, 9) + 0 * pow(2, 10)
+			+ adf_config.R6_MUTE_TILL_LOCK * pow(2, 11) + 0 * pow(2, 12)
+			+ adf_config.R6_BLEED_CURRENT * pow(2, 13)
+			+ adf_config.R6_RF_DIV_SEL * pow(2, 21)
+			+ adf_config.R6_FEEDBACK_SELECT * pow(2, 24) + adf_config.R6_RFOUTB_SELECT * pow(2,25) + 1 * pow(2, 26) +  1 * pow(2, 28)
+			+ adf_config.R6_NEGATIVE_BLEED * pow(2, 29)
+			+ adf_config.R6_GATED_BLEED * pow(2, 30) + adf_config.R6_BLEED_POLARITY * pow(2,31));
 
-	adf_config.REG6 = (int) (6 + D_out_PWR * pow(2, 4) + D_RF_ena * pow(2, 6)
-			+ Reserved * pow(2, 7) + D_RFoutB * pow(2, 10) + D_MTLD * pow(2, 11)
-			+ Reserved * pow(2, 12) + CPBleed * pow(2, 13)
-			+ D_RfDivSel * pow(2, 21) + D_FeedBack * pow(2, 24)
-			+ 10 * pow(2, 25));
+	// adf_config.REG7 =  0x120000E7;
+	adf_config.REG7 = (int) (7 + adf_config.R7_LDM * pow(2, 4)
+			+ adf_config.R7_LDP * pow(2, 5) + adf_config.R7_LOL_MODE * pow(2, 7)
+			+ adf_config.R7_LDC * pow(2, 8) + adf_config.R7_LE_SYNC * pow(2, 25) + 1 * pow(2,26)
+			+ adf_config.R7_LE_SYNC_EDGE * pow(2, 27));
 
-	adf_config.REG7 = 0x120000E7;
-	adf_config.REG8 = 0x102D0428;
-	adf_config.REG9 = 0x2A29FCC9;
-	adf_config.REG10 = 0xC0043A;
-	adf_config.REG11 = 0x61300B;
-	adf_config.REG12 = 0x1041C;
+	// REGISTER 8 IS RESERVED AND NEEDS TO BE SET TO 0x102D0428
+
+	// adf_config.REG9 = 0x2A29FCC9;
+	adf_config.REG9 = (int) (9 + adf_config.R9_SYNTH_LOCK_TIMEOUT * pow(2, 4)
+			+ adf_config.R9_AUTOLVL_CAL_TIMEOUT * pow(2, 9)
+			+ adf_config.R9_TIMEOUT * pow(2, 14)
+			+ adf_config.R9_VCO_BAND_DIV * pow(2, 24));
+
+	//adf_config.REG10 = 0x00C0043A;
+	adf_config.REG10 = (int) (10 + adf_config.R10_ADC_ENABLE * pow(2, 4)
+			+ adf_config.R10_ADC_CONV * pow(2, 5)
+			+ adf_config.R10_ADC_CLK_DIV * pow(2, 6) + 1 * pow(2, 22)
+			+ 1 * pow(2, 23));
+
+	// REGISTER 11 IS RESERVED AND NEEDS TO BE SET TO 0x0061300B in case of a ADF4355 and 0x61200B in case of a ADF4356
+
+	// adf_config.REG12 = 0x0001041C;
+	adf_config.REG12 = (int) (12 + 0x5F * pow(2, 4)
+			+ adf_config.R12_PHASE_RESYNC_CLK_DIV * pow(2, 12));
+
+	adf_config.REG13 = (int) (13 + adf_config.R13_MOD2_MSB * pow(2,4) + adf_config.R13_FRAC2_MSB * pow(2,18));
 }
 
 void ADF4355_WriteData() {
+	HAL_GPIO_WritePin(ADF4355_CS_GPIO_Port, ADF4355_CS_Pin, GPIO_PIN_RESET); // SELECT THE CHIP / PRIME THE INPUT-REGISTER
+	ADF4355_WriteRegister(adf_config.REG13);
 	ADF4355_WriteRegister(adf_config.REG12);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG11);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG10);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG9);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG8);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG7);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG6);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG5);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG4);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG3);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG2);
-	HAL_Delay(1);
+	//HAL_Delay(1);
 	ADF4355_WriteRegister(adf_config.REG1);
 	// TODO: Calculate the Wait-Time: 16/ADF4355_ADC-CLK
-	HAL_Delay(50);
-	ADF4355_WriteRegister(adf_config.REG0);
 	HAL_Delay(1);
+	ADF4355_WriteRegister(adf_config.REG0);
+	HAL_GPIO_WritePin(ADF4355_CS_GPIO_Port, ADF4355_CS_Pin, GPIO_PIN_SET); // SELECT THE CHIP / PRIME THE INPUT-REGISTER
 }
 
 void ADF4355_WriteDataLite(uint8_t mode) {	// Updates only the Registers that
 	switch (mode) {
 	case FREQ_UPDATE:// Update the Frequency - See Datasheet for the Register-Sequence
+		ADF4355_WriteRegister(adf_config.REG13);
 		ADF4355_WriteRegister(adf_config.REG10);
-		HAL_Delay(1);
-		// TODO: set BIT4 of REGISTER 4 TRUE
-		ADF4355_WriteRegister(adf_config.REG4);
-		HAL_Delay(1);
+		//HAL_Delay(1);
+		ADF4355_WriteRegister(adf_config.REG6);
+		//HAL_Delay(1);
 		ADF4355_WriteRegister(adf_config.REG2);
-		HAL_Delay(1);
+		//HAL_Delay(1);
 		ADF4355_WriteRegister(adf_config.REG1);
-		HAL_Delay(1);
-		ADF4355_WriteRegister(adf_config.REG0);
-		HAL_Delay(1);
-		// TODO: Set BIT4 of REGISTER 4 to FALSE
-		ADF4355_WriteRegister(adf_config.REG0);
-		HAL_Delay(50);	// TODO: Calculate the Wait-Time: 16/ADF4355_ADC-CLK
+		//HAL_Delay(1);
 		ADF4355_WriteRegister(adf_config.REG0);
 		break;
 	case PHASE_UPDATE:// Update the Phase-Angle - Only Register 3 needs to be sent
@@ -322,11 +355,11 @@ void ADF4355_WriteDataLite(uint8_t mode) {	// Updates only the Registers that
 }
 
 void ADF4355_WriteRegister(int adfreg) {
-	HAL_GPIO_WritePin(ADF4355_CS_GPIO_Port, ADF4355_LE_Pin, GPIO_PIN_RESET);// SELECT THE CHIP / PRIME THE INPUT-REGISTER
 	uint8_t buf[4];
 	for (int i = 0; i < 4; i++) {
-		buf[i] = (uint8_t) (adfreg >> (i * 8));	// Split the value into 4 Bytes
+		buf[3 - i] = (uint8_t) (adfreg >> (i * 8));	// Split the value into 4 Bytes
 	}
+	HAL_GPIO_WritePin(ADF4355_LE_GPIO_Port, ADF4355_LE_Pin, GPIO_PIN_RESET);// SELECT THE CHIP / PRIME THE INPUT-REGISTER
 	HAL_SPI_Transmit(&hspi2, buf, 4, 800);// Send the Data to the Chip via SPI2
-	HAL_GPIO_WritePin(ADF4355_CS_GPIO_Port, ADF4355_LE_Pin, GPIO_PIN_SET);// DESELECT THE CHIP AND LOAD THE INPUT-REGISTER INTO THE INTERNAL REGISTER SPECIFIED BY THE 4 LSB
+	HAL_GPIO_WritePin(ADF4355_LE_GPIO_Port, ADF4355_LE_Pin, GPIO_PIN_SET);// DESELECT THE CHIP AND LOAD THE INPUT-REGISTER INTO THE INTERNAL REGISTER SPECIFIED BY THE 4 LSB
 }

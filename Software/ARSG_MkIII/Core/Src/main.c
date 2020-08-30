@@ -130,6 +130,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	HAL_GPIO_WritePin(AD9957_CS_GPIO_Port, AD9957_CS_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+	ADF4355_Setup(0x01, 20000000, ADF_DIRECT_CTRL, 400);
 
   /* USER CODE END 2 */
 
@@ -138,10 +139,20 @@ int main(void)
 	while (1) {
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_RESET);
-		//HAL_Delay(1);
+		ADF4355_SetFrequency(102000000);
+		HAL_Delay(2000);
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_SET);
-		//HAL_Delay(1);
+		ADF4355_SetFrequency(3000000001);
+		HAL_Delay(2000);
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_RESET);
+		ADF4355_SetFrequency(220000000);
+		HAL_Delay(2000);
+		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_SET);
+		ADF4355_SetFrequency(6600000000);
+		HAL_Delay(2000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -371,7 +382,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_ENABLE;
   hspi1.Init.CRCPolynomial = 10;
   if (HAL_SPI_Init(&hspi1) != HAL_OK)
   {

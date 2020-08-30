@@ -1,0 +1,3 @@
+AD9957.cpp:10:1:AD9957::AD9957()	16	static
+AD9957.cpp:15:1:AD9957::~AD9957()	16	static
+AD9957.cpp:15:1:virtual AD9957::~AD9957()	16	static
