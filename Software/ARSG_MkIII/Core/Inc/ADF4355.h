@@ -15,6 +15,11 @@ typedef struct ADF4355_Configuration{	// Configuration-Data and Mirror of ADF435
 	double REFCLK;
 	double PFD;
 	unsigned char RFDIV;
+	double N;
+	double FRAC1;
+	double FRAC2;
+	unsigned int MOD1;
+	unsigned int MOD2;
 	uint8_t ERROR;
 	uint8_t MODE;
 	uint8_t FPGA_MODE;

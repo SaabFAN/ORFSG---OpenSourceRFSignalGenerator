@@ -65,8 +65,8 @@ ARSG_MkIII.bin \
 all: ARSG_MkIII.elf secondary-outputs
 
 # Tool invocations
-ARSG_MkIII.elf: $(OBJS) $(USER_OBJS) C:\Users\voyag\OneDrive\STM32Workspaces\ARSG_MkIII\STM32F407VGTX_FLASH.ld
-	arm-none-eabi-g++ -o "ARSG_MkIII.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\voyag\OneDrive\STM32Workspaces\ARSG_MkIII\STM32F407VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="ARSG_MkIII.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+ARSG_MkIII.elf: $(OBJS) $(USER_OBJS) D:\EigeneDateien\OneDrive\STM32Workspaces\ARSG_MkIII\STM32F407VGTX_FLASH.ld
+	arm-none-eabi-g++ -o "ARSG_MkIII.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\EigeneDateien\OneDrive\STM32Workspaces\ARSG_MkIII\STM32F407VGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="ARSG_MkIII.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

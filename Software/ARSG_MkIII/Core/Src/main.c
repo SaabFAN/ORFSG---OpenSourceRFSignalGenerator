@@ -139,7 +139,7 @@ int main(void)
 	while (1) {
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_RESET);
-		ADF4355_SetFrequency(102000000);
+		ADF4355_SetFrequency(156250000);
 		HAL_Delay(2000);
 		HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
 		HAL_GPIO_WritePin(AD9957_IOUP_GPIO_Port, AD9957_IOUP_Pin, GPIO_PIN_SET);
@@ -417,7 +417,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
