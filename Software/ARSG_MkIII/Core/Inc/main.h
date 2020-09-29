@@ -92,6 +92,8 @@ void Error_Handler(void);
 #define FAN_PWM_GPIO_Port GPIOB
 #define FAN_RPM_Pin GPIO_PIN_1
 #define FAN_RPM_GPIO_Port GPIOB
+#define FPGA_IRQ_Pin GPIO_PIN_7
+#define FPGA_IRQ_GPIO_Port GPIOE
 #define AD9957_IOUP_Pin GPIO_PIN_8
 #define AD9957_IOUP_GPIO_Port GPIOE
 #define AD9957_CS_Pin GPIO_PIN_9
