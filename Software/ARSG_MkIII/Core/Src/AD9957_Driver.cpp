@@ -30,19 +30,83 @@ uint8_t AD9957_Driver::Setup(uint8_t startup, long refCLK, uint8_t ctrl_mode,
 	// Setting up the Chip-Configuration
 	ad9957_config.CFR1_OP_MODE = chip_mode;
 	ad9957_config.CFR1_SDIO_IN_ONLY = 1;
-	if (chip_mode == 0xFF) {
-		ad9957_config.CFR1_DIGI_PWRDN = 1;
-		ad9957_config.CFR1_DAC_PWRDN = 1;
-		ad9957_config.CFR1_REFCLK_IN_PWRDN = 1;
-		ad9957_config.CFR1_AUXDAC_PWRDN = 1;
-		ad9957_config.CFR1_EXT_PWRDN_MODE = 1;
-	} else {
+	switch (chip_mode) { // Update the config-variable according to selected Chip Mode
+	case AD_QDUC:
 		ad9957_config.CFR1_DIGI_PWRDN = 0;
 		ad9957_config.CFR1_DAC_PWRDN = 0;
 		ad9957_config.CFR1_REFCLK_IN_PWRDN = 0;
 		ad9957_config.CFR1_AUXDAC_PWRDN = 0;
 		ad9957_config.CFR1_EXT_PWRDN_MODE = 0;
+		ad9957_config.CFR2_PDCLK_ENABLE = 1;
+		ad9957_config.CFR3_DRV0 = 0x01;
+		ad9957_config.CFR3_VCO_SELECT = 0x05;
+		ad9957_config.CFR3_ICP = 0x03;
+		ad9957_config.CFR3_REFCLK_DIV_BYPASS = 0;
+		ad9957_config.CFR3_REFCLK_DIV_RESET = 1;
+		ad9957_config.CFR3_PLL_ENABLE = 1;
+		ad9957_config.CFR3_N = 50;
+		ad9957_config.FSC = 0xFF;
+		ad9957_config.AMP_RAMP_RATE = 128;
+		ad9957_config.AMP_ASF = (int) (1.0 * (pow(2, 14) - 1));
+		ad9957_config.AMP_STEP_SIZE = 0;
+		break;
+	case AD_SINGLE_TONE:
+		ad9957_config.CFR1_DIGI_PWRDN = 0;
+		ad9957_config.CFR1_DAC_PWRDN = 0;
+		ad9957_config.CFR1_REFCLK_IN_PWRDN = 0;
+		ad9957_config.CFR1_AUXDAC_PWRDN = 0;
+		ad9957_config.CFR1_EXT_PWRDN_MODE = 0;
+		ad9957_config.CFR2_EN_PROFILE_REG_ASF_SRC = 1;
+		ad9957_config.CFR2_PDCLK_ENABLE = 1;
+		ad9957_config.CFR3_DRV0 = 0x02;
+		ad9957_config.CFR3_VCO_SELECT = 0x05;
+		ad9957_config.CFR3_ICP = 0x03;
+		ad9957_config.CFR3_REFCLK_DIV_BYPASS = 0;
+		ad9957_config.CFR3_REFCLK_DIV_RESET = 1;
+		ad9957_config.CFR3_PLL_ENABLE = 1;
+		ad9957_config.CFR3_N = 50;
+		ad9957_config.FSC = 0xFF;
+		ad9957_config.AMP_RAMP_RATE = 128;
+		ad9957_config.AMP_ASF = (int) (1.0 * (pow(2, 14) - 1));
+		ad9957_config.AMP_STEP_SIZE = 0;
+		break;
+	case AD_IDAC:
+		ad9957_config.CFR1_DIGI_PWRDN = 0;
+		ad9957_config.CFR1_DAC_PWRDN = 0;
+		ad9957_config.CFR1_REFCLK_IN_PWRDN = 0;
+		ad9957_config.CFR1_AUXDAC_PWRDN = 0;
+		ad9957_config.CFR1_EXT_PWRDN_MODE = 0;
+		ad9957_config.CFR2_PDCLK_ENABLE = 1;
+		ad9957_config.CFR3_DRV0 = 0x03;
+		ad9957_config.CFR3_VCO_SELECT = 0x05;
+		ad9957_config.CFR3_ICP = 0x03;
+		ad9957_config.CFR3_REFCLK_DIV_BYPASS = 0;
+		ad9957_config.CFR3_REFCLK_DIV_RESET = 1;
+		ad9957_config.CFR3_PLL_ENABLE = 1;
+		ad9957_config.CFR3_N = 50;
+		ad9957_config.FSC = 0xFF;
+		ad9957_config.AMP_RAMP_RATE = 128;
+		ad9957_config.AMP_ASF = (int) (1.0 * (pow(2, 14) - 1));
+		ad9957_config.AMP_STEP_SIZE = 0;
+		break;
+	case AD_OFF:
+		ad9957_config.CFR1_DIGI_PWRDN = 1;
+		ad9957_config.CFR1_DAC_PWRDN = 1;
+		ad9957_config.CFR1_REFCLK_IN_PWRDN = 1;
+		ad9957_config.CFR1_AUXDAC_PWRDN = 1;
+		ad9957_config.CFR1_EXT_PWRDN_MODE = 1;
+		break;
 	}
+	switch (int_RAM_mode) {
+	// TODO: Configure Chip to use internal RAM depending on the settings
+	case RAM_OFF:
+		ad9957_config.CFR1_RAM_EN = 0;
+		break;
+	default:
+		ad9957_config.CFR1_RAM_EN = 0;
+		break;
+	}
+	ad9957_config.SYSCLK = ad9957_config.REFCLK * ad9957_config.CFR3_N;
 	ST_SetFrequency(5000000.0);
 	ST_SetAmplitude(1.0);
 	ST_SetPhase(0.0);
@@ -86,7 +150,10 @@ uint8_t AD9957_Driver::SetupRamp(double startFreq, double stopFreq,
 
 // Single Tone Mode-Functions
 uint8_t AD9957_Driver::ST_SetFrequency(double frequency) {
-	ad9957_config.ST_FTW = (int) (pow(2,32) * (frequency/ad9957_config.REFCLK));
+	double ftw = pow(2,32) - 1;
+	ftw = ftw * (frequency / ad9957_config.SYSCLK);
+	ad9957_config.ST_FTW = (int) ftw;
+	ad9957_config.QDUC_FTW = ad9957_config.ST_FTW;
 	return error;
 }
 
@@ -97,7 +164,7 @@ uint8_t AD9957_Driver::ST_SetPhase(double phase) {
 }
 
 uint8_t AD9957_Driver::ST_SetAmplitude(double amplitude) {
-	ad9957_config.AMP_ASF = (int) (pow(2,14) * amplitude);
+	ad9957_config.AMP_ASF = (int) (pow(2, 14) * amplitude);
 	return error;
 }
 
@@ -113,11 +180,11 @@ uint8_t AD9957_Driver::ST_FillRAM_FPGA(double frequency, double phase,
 	// TODO: Implement FPGA AD9957 Statemachine
 	return error;
 }
-uint8_t AD9957_Driver::ST_StartRAMP() {
+uint8_t AD9957_Driver::ST_StartRAMPB() {
 	return error;
 }
 
-uint8_t AD9957_Driver::ST_STOP() {
+uint8_t AD9957_Driver::ST_StopRAMPB() {
 	return error;
 }
 
@@ -169,26 +236,79 @@ uint8_t AD9957_Driver::RAM_Write(uint16_t address, uint32_t word) {
 uint8_t AD9957_Driver::Generate_Registers(uint8_t UpdateMode, uint8_t profile) {
 	switch (UpdateMode) {
 	case 0xFF:
-		reg.REG_CFR1 = (int) ((ad9957_config.CFR1_LSB_FIRST * pow(2, 0)) + (ad9957_config.CFR1_SDIO_IN_ONLY * pow(2,1))+ (ad9957_config.CFR1_AUTO_PWRDN * pow(2,2)) + (ad9957_config.CFR1_EXT_PWRDN_MODE * pow(2,3)) + (ad9957_config.CFR1_AUXDAC_PWRDN * pow(2,4)) + (ad9957_config.CFR1_REFCLK_IN_PWRDN * pow(2,5)) + (ad9957_config.CFR1_DAC_PWRDN * pow(2,6)) + (ad9957_config.CFR1_DIGI_PWRDN * pow(2,7)) + (ad9957_config.CFR1_OSK_AUTO * pow(2,8)) + (ad9957_config.CFR1_OSK_ENABLE * pow(2,9)) + (ad9957_config.CFR1_LOAD_ARR_IOUP * pow(2,10)) + (ad9957_config.CFR1_CLR_PHASE_ACCU * pow(2,11)) + (ad9957_config.CFR1_AUTOCLR_PHASE_ACCU * pow(2, 13)) + (ad9957_config.CFR1_SDIO_IN_ONLY * pow(2, 16)) + (ad9957_config.CFR1_CLEAR_CCI * pow(2,21)) + (ad9957_config.CFR1_INV_SINC_FILT * pow(2,22)) + (ad9957_config.CFR1_MAN_OSK_CTRL * pow(2,23)) + (ad9957_config.CFR1_OP_MODE * pow(2,25)) + (ad9957_config.CFR1_RAM_PB_DEST * pow(2,28)) + (ad9957_config.CFR1_RAM_EN * pow(2, 31)));	// Calculate CFR1
-		reg.REG_CFR2 = (int) ((ad9957_config.CFR2_SYNC_TIMING_VAL_DISABLE * pow(2, 5)) + (ad9957_config.CFR2_DATA_ASSEMB_HOLD_LAST * pow(2, 6)) + (ad9957_config.CFR2_Q_FIRST_DATA_PROC * pow(2, 8)) + (ad9957_config.CFR2_TXENABLE_INVERT * pow(2,9)) + (ad9957_config.CFR2_PDCLK_INVERT * pow(2,10)) + (ad9957_config.CFR2_PDCLK_ENABLE * pow(2,11)) + (ad9957_config.CFR2_DATA_FORMAT * pow(2,12)) + (ad9957_config.CFR2_PDCLK_RATE * pow(2,13)) + (ad9957_config.CFR2_IOUP_RATE_DIV * pow(2,14)) + (ad9957_config.CFR2_READ_EFF_FTW * pow(2,16)) + (ad9957_config.CFR2_SYNC_CLK_EN * pow(2,22)) + (ad9957_config.CFR2_INT_IOUP_ACTIVE * pow(2,23)) + (ad9957_config.CFR2_EN_PROFILE_REG_ASF_SRC * pow(2,24)) + (ad9957_config.CFR2_BLACKFIN_EARLY_FRAME_SYNC * pow(2,29)) + (ad9957_config.CFR2_BLACKFIN_BIT_ORDER * pow(2,30)) + (ad9957_config.CFR2_BLACKFIN_ACTIVE * pow(2,31)));
-		reg.REG_CFR3 = (int) ((ad9957_config.CFR3_N * pow(2,1)) + (ad9957_config.CFR3_PLL_ENABLE * pow(2,8)) + (ad9957_config.CFR3_REFCLK_DIV_RESET * pow(2,14)) + (ad9957_config.CFR3_REFCLK_DIV_BYPASS * pow(2,15)) + (ad9957_config.CFR3_ICP * pow(2,19)) + (ad9957_config.CFR3_VCO_SELECT * pow(2,24)) + (ad9957_config.CFR3_DRV0 * pow(2,28)));
+		reg.REG_CFR1 = (int) ((ad9957_config.CFR1_LSB_FIRST * pow(2, 0))
+				+ (ad9957_config.CFR1_SDIO_IN_ONLY * pow(2, 1))
+				+ (ad9957_config.CFR1_AUTO_PWRDN * pow(2, 2))
+				+ (ad9957_config.CFR1_EXT_PWRDN_MODE * pow(2, 3))
+				+ (ad9957_config.CFR1_AUXDAC_PWRDN * pow(2, 4))
+				+ (ad9957_config.CFR1_REFCLK_IN_PWRDN * pow(2, 5))
+				+ (ad9957_config.CFR1_DAC_PWRDN * pow(2, 6))
+				+ (ad9957_config.CFR1_DIGI_PWRDN * pow(2, 7))
+				+ (ad9957_config.CFR1_OSK_AUTO * pow(2, 8))
+				+ (ad9957_config.CFR1_OSK_ENABLE * pow(2, 9))
+				+ (ad9957_config.CFR1_LOAD_ARR_IOUP * pow(2, 10))
+				+ (ad9957_config.CFR1_CLR_PHASE_ACCU * pow(2, 11))
+				+ (ad9957_config.CFR1_AUTOCLR_PHASE_ACCU * pow(2, 13))
+				+ (ad9957_config.CFR1_SEL_DDS_OUTPUT * pow(2, 16))
+				+ (ad9957_config.CFR1_CLEAR_CCI * pow(2, 21))
+				+ (ad9957_config.CFR1_INV_SINC_FILT * pow(2, 22))
+				+ (ad9957_config.CFR1_MAN_OSK_CTRL * pow(2, 23))
+				+ (ad9957_config.CFR1_OP_MODE * pow(2, 25))
+				+ (ad9957_config.CFR1_RAM_PB_DEST * pow(2, 28))
+				+ (ad9957_config.CFR1_RAM_EN * pow(2, 31)));// Calculate CFR1
+		reg.REG_CFR2 = (int) ((ad9957_config.CFR2_SYNC_TIMING_VAL_DISABLE
+				* pow(2, 5))
+				+ (ad9957_config.CFR2_DATA_ASSEMB_HOLD_LAST * pow(2, 6))
+				+ (ad9957_config.CFR2_Q_FIRST_DATA_PROC * pow(2, 8))
+				+ (ad9957_config.CFR2_TXENABLE_INVERT * pow(2, 9))
+				+ (ad9957_config.CFR2_PDCLK_INVERT * pow(2, 10))
+				+ (ad9957_config.CFR2_PDCLK_ENABLE * pow(2, 11))
+				+ (ad9957_config.CFR2_DATA_FORMAT * pow(2, 12))
+				+ (ad9957_config.CFR2_PDCLK_RATE * pow(2, 13))
+				+ (ad9957_config.CFR2_IOUP_RATE_DIV * pow(2, 14))
+				+ (ad9957_config.CFR2_READ_EFF_FTW * pow(2, 16))
+				+ (ad9957_config.CFR2_SYNC_CLK_EN * pow(2, 22))
+				+ (ad9957_config.CFR2_INT_IOUP_ACTIVE * pow(2, 23))
+				+ (ad9957_config.CFR2_EN_PROFILE_REG_ASF_SRC * pow(2, 24))
+				+ (ad9957_config.CFR2_BLACKFIN_EARLY_FRAME_SYNC * pow(2, 29))
+				+ (ad9957_config.CFR2_BLACKFIN_BIT_ORDER * pow(2, 30))
+				+ (ad9957_config.CFR2_BLACKFIN_ACTIVE * pow(2, 31)));
+		reg.REG_CFR3 = (int) ((ad9957_config.CFR3_N * pow(2, 1))
+				+ (ad9957_config.CFR3_PLL_ENABLE * pow(2, 8))
+				+ (ad9957_config.CFR3_REFCLK_DIV_RESET * pow(2, 14))
+				+ (ad9957_config.CFR3_REFCLK_DIV_BYPASS * pow(2, 15))
+				+ (ad9957_config.CFR3_ICP * pow(2, 19))
+				+ (ad9957_config.CFR3_VCO_SELECT * pow(2, 24))
+				+ (ad9957_config.CFR3_DRV0 * pow(2, 28)));
 		reg.REG_AUX_DAC = (int) ad9957_config.FSC;
 		reg.REG_IOUP_RATE = (int) ad9957_config.IOUPDATE_RATE;
 		reg.REG_RAMSEG0_1 = (int) ad9957_config.RAM_ADDRESS_STEP_RATE_0;
-		reg.REG_RAMSEG0_0 = (int) ((ad9957_config.RAM_PB_MODE_0 * pow(2,0)) + (ad9957_config.RAM_START_ADDR_0 * pow(2,6)) + (ad9957_config.RAM_END_ADDR_0 * pow(2,22)));
+		reg.REG_RAMSEG0_0 = (int) ((ad9957_config.RAM_PB_MODE_0 * pow(2, 0))
+				+ (ad9957_config.RAM_START_ADDR_0 * pow(2, 6))
+				+ (ad9957_config.RAM_END_ADDR_0 * pow(2, 22)));
 		reg.REG_RAMSEG1_1 = (int) ad9957_config.RAM_ADDRESS_STEP_RATE_1;
-		reg.REG_RAMSEG1_0 = (int) ((ad9957_config.RAM_PB_MODE_1 * pow(2,0)) + (ad9957_config.RAM_START_ADDR_1 * pow(2,6)) + (ad9957_config.RAM_END_ADDR_1 * pow(2,22)));
-		reg.REG_AMP = (int) ((ad9957_config.AMP_STEP_SIZE * pow(2,0)) + (ad9957_config.AMP_ASF * pow(2,2)) + (ad9957_config.AMP_RAMP_RATE * pow(2,16)));
+		reg.REG_RAMSEG1_0 = (int) ((ad9957_config.RAM_PB_MODE_1 * pow(2, 0))
+				+ (ad9957_config.RAM_START_ADDR_1 * pow(2, 6))
+				+ (ad9957_config.RAM_END_ADDR_1 * pow(2, 22)));
+		reg.REG_AMP = (int) ((ad9957_config.AMP_STEP_SIZE * pow(2, 0))
+				+ (ad9957_config.AMP_ASF * pow(2, 2))
+				+ (ad9957_config.AMP_RAMP_RATE * pow(2, 16)));
 		// reg.REG_MULTICHIP_SYNC = Assemble Multichip-Sync Register - Nothign to do here, since only one chip used.
-		reg.REG_ST1 = (int) ((ad9957_config.ST_POW * pow(2,0)) + (ad9957_config.ST_ASF * pow(2,16)));
+		reg.REG_ST1 = (int) ((ad9957_config.ST_POW * pow(2, 0))
+				+ (ad9957_config.ST_ASF * pow(2, 16)));
 		reg.REG_ST0 = (int) ad9957_config.ST_FTW;
-		reg.REG_QDUC1 = (int) ((ad9957_config.QDUC_POW * pow(2,0)) + (ad9957_config.QDUC_OSK * pow(2,16)) + (ad9957_config.QDUC_CCI_INVERSE_BYPASS * pow(2,24)) + (ad9957_config.QDUC_SPECTRAL_INVERT * pow(2,25)) + (ad9957_config.QDUC_CCI_INTERPOLATION_RATE * 2,26));
+		reg.REG_QDUC1 = (int) ((ad9957_config.QDUC_POW * pow(2, 0))
+				+ (ad9957_config.QDUC_OSK * pow(2, 16))
+				+ (ad9957_config.QDUC_CCI_INVERSE_BYPASS * pow(2, 24))
+				+ (ad9957_config.QDUC_SPECTRAL_INVERT * pow(2, 25))
+				+ (ad9957_config.QDUC_CCI_INTERPOLATION_RATE * 2, 26));
 		reg.REG_QDUC0 = (int) ad9957_config.QDUC_FTW;
-		reg.REG_RAM = (int) 0;	// TODO: Generate the content of the RAM-Register
+		reg.REG_RAM = (int) 0;// TODO: Generate the content of the RAM-Register
 		// TODO: Update All Registers
 		WriteRegister(CFR1);
 		WriteRegister(CFR2);
 		WriteRegister(CFR3);
+		WriteRegister(AUXDAC);
 		WriteRegister(AMP);
 		WriteRegister(PROFILE_0);
 		break;
@@ -328,20 +448,23 @@ uint8_t AD9957_Driver::WriteRegister(uint8_t regAddr) { // Subroutine that Write
 		break;
 	case CFR2:
 		reglength = 5;
-				datawordL = &reg.REG_CFR2;
-				break;
+		datawordL = &reg.REG_CFR2;
+		break;
 	case CFR3:
-			reglength = 5;
-			datawordL = &reg.REG_CFR3;
-			break;
+		reglength = 5;
+		datawordL = &reg.REG_CFR3;
+		break;
+	case AUXDAC:
+		reglength = 5;
+		datawordL = &reg.REG_AUX_DAC;
 	case AMP:
-			reglength = 5;
-			datawordL = &reg.REG_AMP;
-			break;
+		reglength = 5;
+		datawordL = &reg.REG_AMP;
+		break;
 	}
 	uint8_t buf[reglength];
 	uint8_t transmitSize = reglength;
-	buf[reglength] = regAddr;
+	buf[0] = regAddr;
 	reglength--;
 
 	// TODO: REWORK THIS SECTION TO MAKE IT COMPATIBLE WITH 6 BYTE LONG REGISTERS!

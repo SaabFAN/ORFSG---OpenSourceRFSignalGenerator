@@ -52,10 +52,12 @@ extern SPI_HandleTypeDef hspi2;
 // Modes
 #define AD_DIRECT_CTRL 0xD0
 #define AD_FPGA_CTRL 0xF0
+// Chip Operating MOdes
 #define AD_QDUC 0x00
 #define AD_SINGLE_TONE 0x01
 #define AD_IDAC 0x02
 #define AD_OFF 0xFF
+// RAM Destinations / Operating-Modes
 #define RAM_QDUC 0x00
 #define RAM_ST 0x01
 #define RAM_IDAC 0x02
@@ -64,6 +66,7 @@ extern SPI_HandleTypeDef hspi2;
 // Datastructure that holds the Configuration-Data for the AD9957
 typedef struct AD9957_InternalConfig {
 	double REFCLK;
+	double SYSCLK;
 	// FPGA-Settings:
 	uint8_t fpga_mode;
 
@@ -208,8 +211,8 @@ public:
 			double amplitude, uint16_t address);// Fill the RAM internal to the AD9957 with data that can be played back in Single Tone-Mode
 	uint8_t ST_FillRAM_FPGA(double frequency, double phase, double amplitude,
 			uint32_t address);// Fill the RAM of the FPGA with data that can be played back in Single Tone-Mode
-	uint8_t ST_StartRAMP();
-	uint8_t ST_STOP();
+	uint8_t ST_StartRAMPB();
+	uint8_t ST_StopRAMPB();
 	// Interpolating DAC-Functions
 	uint8_t IDAC_WriteBuffer(uint16_t address, uint16_t DACword); // Write the DAC-Buffer one Data-Word at a time. The selected Mode determines where the data goes (AD9957 Internal RAM, or FPGA SDRAM)
 	uint8_t IDAC_Start();
